@@ -6,6 +6,6 @@ Ce dépôt public sert uniquement à distribuer les APK/AAB de TechniChauff.
 - Dernières versions : https://github.com/pollomax847/TechniChauff/releases/latest
 - Installation F-Droid : https://github.com/pollomax847/TechniChauff/blob/main/docs/installer-via-fdroid.md
 
-## Capture décran
+## Capture decran
 
 ![Capture TechniChauff](docs/screenshot-main.png)
