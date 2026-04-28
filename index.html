@@ -4,50 +4,55 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TechniChauff | Installer via F-Droid</title>
-  <meta name="description" content="Installer TechniChauff via F-Droid, avec un acces clair aux variantes complete et technicien.">
+  <meta name="description" content="Installer TechniChauff via F-Droid avec un acces simple aux variantes complete et technicien.">
   <style>
     :root {
       --bg: #f4efe7;
-      --card: rgba(255,255,255,0.82);
+      --card: rgba(255,255,255,0.84);
       --ink: #132a22;
-      --muted: #4d5f58;
+      --muted: #52645d;
       --accent: #0f766e;
-      --accent-2: #d97706;
-      --border: rgba(19,42,34,0.12);
-      --shadow: 0 20px 60px rgba(19,42,34,0.12);
+      --accent2: #c66a0a;
+      --line: rgba(19,42,34,0.12);
+      --shadow: 0 24px 64px rgba(19,42,34,0.12);
       --radius: 24px;
     }
+
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
       font-family: "Segoe UI", "Helvetica Neue", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(217,119,6,0.16), transparent 35%),
-        radial-gradient(circle at right 20%, rgba(15,118,110,0.18), transparent 32%),
+        radial-gradient(circle at top left, rgba(198,106,10,0.15), transparent 35%),
+        radial-gradient(circle at right 20%, rgba(15,118,110,0.18), transparent 34%),
         linear-gradient(180deg, #fbf7f1 0%, var(--bg) 100%);
     }
+
     .wrap {
       width: min(1120px, calc(100% - 32px));
       margin: 0 auto;
-      padding: 40px 0 56px;
+      padding: 36px 0 56px;
     }
+
     .hero {
       display: grid;
       grid-template-columns: 1.2fr 0.8fr;
       gap: 28px;
       align-items: stretch;
     }
+
     .panel, .card {
       background: var(--card);
-      border: 1px solid var(--border);
+      border: 1px solid var(--line);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      backdrop-filter: blur(8px);
+      backdrop-filter: blur(10px);
     }
-    .panel {
-      padding: 36px;
-    }
+
+    .panel { padding: 34px; }
+
     .eyebrow {
       display: inline-block;
       padding: 8px 12px;
@@ -56,53 +61,61 @@
       color: var(--accent);
       font-size: 13px;
       font-weight: 700;
-      letter-spacing: 0.04em;
       text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
+
     h1 {
       margin: 16px 0 12px;
-      font-size: clamp(36px, 5vw, 64px);
-      line-height: 0.96;
+      font-size: clamp(38px, 5vw, 64px);
+      line-height: 0.95;
       letter-spacing: -0.04em;
     }
+
     .lead {
       margin: 0;
       max-width: 60ch;
       font-size: 18px;
-      line-height: 1.6;
+      line-height: 1.65;
       color: var(--muted);
     }
+
     .actions {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0,1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 16px;
-      margin-top: 28px;
+      margin-top: 26px;
     }
+
     .action {
       display: block;
       text-decoration: none;
       color: inherit;
       padding: 20px;
       border-radius: 20px;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.72);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.75);
       transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
     }
+
     .action:hover {
       transform: translateY(-2px);
-      box-shadow: 0 16px 40px rgba(19,42,34,0.10);
-      border-color: rgba(15,118,110,0.35);
+      box-shadow: 0 18px 42px rgba(19,42,34,0.10);
+      border-color: rgba(15,118,110,0.34);
     }
+
     .action strong {
       display: block;
       font-size: 22px;
       margin-bottom: 8px;
     }
+
     .action span {
       display: block;
       color: var(--muted);
-      line-height: 1.5;
+      line-height: 1.55;
     }
+
     .action code {
       display: block;
       margin-top: 12px;
@@ -113,10 +126,12 @@
       font-size: 12px;
       overflow-wrap: anywhere;
     }
+
     .shot {
       overflow: hidden;
       padding: 14px;
     }
+
     .shot img {
       width: 100%;
       height: 100%;
@@ -124,50 +139,58 @@
       border-radius: 18px;
       display: block;
     }
+
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 24px;
       margin-top: 28px;
     }
-    .card {
-      padding: 24px;
-    }
+
+    .card { padding: 24px; }
+
     h2 {
       margin: 0 0 14px;
       font-size: 24px;
       letter-spacing: -0.03em;
     }
-    ol, ul {
+
+    p, ol, ul {
       margin: 0;
-      padding-left: 20px;
       color: var(--muted);
       line-height: 1.7;
     }
+
+    ol, ul { padding-left: 20px; }
+
     .notice {
       margin-top: 28px;
       padding: 20px 22px;
       border-radius: 20px;
-      background: linear-gradient(135deg, rgba(217,119,6,0.12), rgba(255,255,255,0.78));
-      border: 1px solid rgba(217,119,6,0.22);
+      background: linear-gradient(135deg, rgba(198,106,10,0.12), rgba(255,255,255,0.80));
+      border: 1px solid rgba(198,106,10,0.20);
       color: #5b3d13;
     }
+
     .notice strong {
       display: block;
       margin-bottom: 8px;
       font-size: 18px;
     }
-    .footer-links {
+
+    .links {
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
       margin-top: 22px;
     }
-    .footer-links a {
+
+    .links a {
       text-decoration: none;
       color: var(--accent);
       font-weight: 700;
     }
+
     @media (max-width: 860px) {
       .hero, .grid, .actions { grid-template-columns: 1fr; }
       .panel { padding: 28px; }
@@ -194,9 +217,9 @@
             <code>https://pollomax847.github.io/TechniChauff/fdroid-technicien/fdroid/repo</code>
           </a>
         </div>
-        <div class="footer-links">
+        <div class="links">
           <a href="https://github.com/pollomax847/TechniChauff/releases/latest">Dernieres releases APK</a>
-          <a href="https://github.com/pollomax847/assistant_entretien_chaudiere">Code source prive</a>
+          <a href="https://github.com/f-droid/fdroiddata">Depot officiel F-Droid</a>
         </div>
       </div>
       <div class="panel shot">
@@ -211,19 +234,19 @@
           <li>Ouvrez F-Droid.</li>
           <li>Allez dans Parametres puis Mes depots.</li>
           <li>Appuyez sur Ajouter un depot.</li>
-          <li>Collez l'URL de la variante voulue.</li>
-          <li>Validez et laissez F-Droid synchroniser l'index.</li>
+          <li>Collez l URL de la variante voulue.</li>
+          <li>Validez puis laissez F-Droid synchroniser l index.</li>
         </ol>
       </article>
       <article class="card">
-        <h2>A propos du depot officiel F-Droid</h2>
-        <p style="margin:0;color:var(--muted);line-height:1.7;">L'application n'est pas encore dans le depot officiel F-Droid. Pour y entrer, il faut une soumission a <a href="https://github.com/f-droid/fdroiddata">fdroiddata</a> et une build reproductible sans dependances proprietaires bloquantes.</p>
+        <h2>Depot officiel F-Droid</h2>
+        <p>Pour apparaitre dans le vrai depot F-Droid, il faut une soumission a fdroiddata et une build reproductible sans dependances Google/Firebase bloquantes. Tel quel, l application utilise encore Google Sign-In et Firebase, donc une variante dediee sans ces dependances sera probablement necessaire.</p>
       </article>
     </section>
 
     <section class="notice">
       <strong>Avertissement third-party repository</strong>
-      Le message affiche par F-Droid est normal pour un depot auto-heberge. Il signifie que le depot est publie par TechniChauff et non audite directement par l'equipe officielle F-Droid. Ce n'est pas un signal d'erreur de deploiement.
+      Le message affiche par F-Droid est normal pour un depot auto-heberge. Il indique que le depot est publie par TechniChauff et non audite directement par l equipe officielle F-Droid.
     </section>
   </main>
 </body>
