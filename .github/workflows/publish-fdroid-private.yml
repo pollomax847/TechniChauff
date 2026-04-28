@@ -1,0 +1,392 @@
+name: Publish F-Droid Private Repo
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_apk:
+        description: Build APK in workflow
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      variant:
+        description: APP_VARIANT used when build_apk=true
+        required: true
+        default: technicien
+        type: choice
+        options: [complete, technicien]
+      build_name:
+        description: Optional base app version name (example 0.0.0)
+        required: false
+        default: ""
+      build_number:
+        description: Optional base app build number (example 6)
+        required: false
+        default: ""
+      auto_variant_versioning:
+        description: Auto-separate complete/technicien versions from base build inputs
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      auto_variant_repo_split:
+        description: Auto-split publish path and repo URL per variant
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      fail_if_duplicate_build:
+        description: Fail run if remote F-Droid index already contains the effective build number
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      verify_published_urls:
+        description: Verify published index URLs after gh-pages push
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      apk_path:
+        description: Existing APK path when build_apk=false
+        required: false
+        default: ""
+      repo_name:
+        description: F-Droid repo name
+        required: true
+        default: TechniChauff Private F-Droid
+      repo_url:
+        description: Public base URL to fdroid repo (must end with /fdroid/repo)
+        required: true
+        default: https://pollomax847.github.io/assistant_entretien_chaudiere/fdroid/repo
+      publish_branch:
+        description: Branch used to host static repository files
+        required: true
+        default: gh-pages
+      publish_repository:
+        description: Optional target repository owner/name for publication (example pollomax847/assistant_entretien_chaudiere_pages)
+        required: false
+        default: ""
+      publish_path:
+        description: Directory in publish_branch where fdroid files are pushed
+        required: true
+        default: fdroid
+
+concurrency:
+  group: fdroid-private-${{ github.ref }}-${{ inputs.variant }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish-fdroid:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        if: ${{ inputs.build_apk == 'true' }}
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Decode Google Services
+        if: ${{ inputs.build_apk == 'true' }}
+        env:
+          FIREBASE_GOOGLE_SERVICES_B64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$FIREBASE_GOOGLE_SERVICES_B64" ]]; then
+            echo "ERROR: FIREBASE_GOOGLE_SERVICES_B64 secret not set" >&2
+            exit 1
+          fi
+          echo "$FIREBASE_GOOGLE_SERVICES_B64" | base64 -d > android/app/google-services.json
+          echo "Decoded google-services.json to $(pwd)/android/app/google-services.json"
+          # Patch: add missing package names expected by Gradle (com.example.*)
+          GS=android/app/google-services.json
+          PKG1="com.example.assistant_entretien_chaudiere_app"
+          PKG2="com.example.assistant_entretien_chaudiere_app.technicien"
+          jq --arg p1 "$PKG1" --arg p2 "$PKG2" \
+            '.client as $orig | .client |= . + [($orig[0] | .client_info.android_client_info.package_name = $p1), ($orig[0] | .client_info.android_client_info.package_name = $p2)]' \
+            "$GS" > /tmp/gs_patched.json && mv /tmp/gs_patched.json "$GS"
+          echo "google-services.json patched OK"
+
+      - name: Build release APK
+        if: ${{ inputs.build_apk == 'true' }}
+        env:
+          INPUT_BUILD_NAME: ${{ inputs.build_name }}
+          INPUT_BUILD_NUMBER: ${{ inputs.build_number }}
+          INPUT_VARIANT: ${{ inputs.variant }}
+          INPUT_AUTO_VARIANT_VERSIONING: ${{ inputs.auto_variant_versioning }}
+        run: |
+          flutter --version
+          flutter pub get
+
+          EFFECTIVE_BUILD_NAME="$INPUT_BUILD_NAME"
+          EFFECTIVE_BUILD_NUMBER="$INPUT_BUILD_NUMBER"
+
+          if [[ "$INPUT_AUTO_VARIANT_VERSIONING" == "true" ]]; then
+            if [[ -n "$INPUT_BUILD_NAME" ]]; then
+              EFFECTIVE_BUILD_NAME="${INPUT_BUILD_NAME}-${INPUT_VARIANT}"
+            fi
+            if [[ -n "$INPUT_BUILD_NUMBER" ]]; then
+              if [[ ! "$INPUT_BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+                echo "build_number must be numeric when provided" >&2
+                exit 1
+              fi
+              if [[ "$INPUT_VARIANT" == "technicien" ]]; then
+                EFFECTIVE_BUILD_NUMBER="$((INPUT_BUILD_NUMBER + 1))"
+              fi
+            fi
+          fi
+
+          BUILD_ARGS=()
+          if [[ -n "$EFFECTIVE_BUILD_NAME" ]]; then
+            BUILD_ARGS+=("--build-name=$EFFECTIVE_BUILD_NAME")
+          fi
+          if [[ -n "$EFFECTIVE_BUILD_NUMBER" ]]; then
+            BUILD_ARGS+=("--build-number=$EFFECTIVE_BUILD_NUMBER")
+          fi
+
+          echo "Variant: $INPUT_VARIANT"
+          echo "Build name: ${EFFECTIVE_BUILD_NAME:-<pubspec default>}"
+          echo "Build number: ${EFFECTIVE_BUILD_NUMBER:-<pubspec default>}"
+
+          flutter build apk --release --dart-define=APP_VARIANT=${{ inputs.variant }} "${BUILD_ARGS[@]}"
+
+      - name: Guard duplicate build number
+        if: ${{ inputs.fail_if_duplicate_build == 'true' && inputs.build_number != '' }}
+        shell: bash
+        env:
+          INPUT_BUILD_NUMBER: ${{ inputs.build_number }}
+          INPUT_VARIANT: ${{ inputs.variant }}
+          INPUT_AUTO_VARIANT_VERSIONING: ${{ inputs.auto_variant_versioning }}
+          INPUT_AUTO_VARIANT_REPO_SPLIT: ${{ inputs.auto_variant_repo_split }}
+          INPUT_REPO_URL: ${{ inputs.repo_url }}
+          INPUT_PUBLISH_PATH: ${{ inputs.publish_path }}
+        run: |
+          set -euo pipefail
+
+          TARGET_BUILD="$INPUT_BUILD_NUMBER"
+          if [[ "$INPUT_AUTO_VARIANT_VERSIONING" == "true" && "$INPUT_VARIANT" == "technicien" ]]; then
+            TARGET_BUILD="$((INPUT_BUILD_NUMBER + 1))"
+          fi
+
+          EFFECTIVE_REPO_URL="${INPUT_REPO_URL%/}"
+          if [[ "$INPUT_AUTO_VARIANT_REPO_SPLIT" == "true" ]]; then
+                    EFFECTIVE_REPO_URL="$(printf '%s' "$EFFECTIVE_REPO_URL" | sed -E 's#/repo$##; s#/fdroid$##; s#/fdroid-(complete|technicien)$##')"
+                    EFFECTIVE_REPO_URL="${EFFECTIVE_REPO_URL}/fdroid-${INPUT_VARIANT}/fdroid/repo"
+          fi
+
+          TMP_FILE="$(mktemp)"
+          INDEX_JSON_URL="${EFFECTIVE_REPO_URL%/}/index-v1.json"
+          INDEX_XML_URL="${EFFECTIVE_REPO_URL%/}/index.xml"
+          found_duplicate=false
+
+          if curl -fsSL "$INDEX_JSON_URL" -o "$TMP_FILE"; then
+            if grep -Eq '"versionCode"[[:space:]]*:[[:space:]]*'"${TARGET_BUILD}"'\b' "$TMP_FILE"; then
+              found_duplicate=true
+            fi
+          elif curl -fsSL "$INDEX_XML_URL" -o "$TMP_FILE"; then
+            if grep -Eqi '(<versioncode>|<versionCode>|versionCode=")'"${TARGET_BUILD}"'("|</versioncode>|</versionCode>)' "$TMP_FILE"; then
+              found_duplicate=true
+            fi
+          else
+            HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' "${EFFECTIVE_REPO_URL%/}" || true)"
+            if [[ "$HTTP_CODE" =~ ^(2|3|404) ]]; then
+              echo "Remote repo reachable (HTTP ${HTTP_CODE}) but no index yet; duplicate guard skipped."
+            else
+              echo "Remote repo unreachable (${EFFECTIVE_REPO_URL}), HTTP=${HTTP_CODE}; network/DNS issue." >&2
+              exit 1
+            fi
+          fi
+
+          rm -f "$TMP_FILE"
+
+          if [[ "$found_duplicate" == "true" ]]; then
+            echo "Build number ${TARGET_BUILD} already exists in ${EFFECTIVE_REPO_URL}" >&2
+            exit 1
+          fi
+
+          echo "Duplicate guard passed for build ${TARGET_BUILD}."
+
+      - name: Resolve APK path
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ inputs.build_apk }}" == "true" ]]; then
+            APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          else
+            APK_PATH="${{ inputs.apk_path }}"
+            if [[ -z "$APK_PATH" ]]; then
+              APK_PATH="$(find apks -type f -name '*.apk' | sort | tail -1 || true)"
+            fi
+          fi
+
+          if [[ -z "$APK_PATH" || ! -f "$APK_PATH" ]]; then
+            echo "APK not found: $APK_PATH" >&2
+            exit 1
+          fi
+
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install fdroidserver
+        run: |
+          python -m pip install --upgrade pip
+          pip install fdroidserver
+
+      - name: Resolve variant repo settings
+        id: repo_settings
+        shell: bash
+        env:
+          INPUT_VARIANT: ${{ inputs.variant }}
+          INPUT_AUTO_VARIANT_REPO_SPLIT: ${{ inputs.auto_variant_repo_split }}
+          INPUT_REPO_NAME: ${{ inputs.repo_name }}
+          INPUT_REPO_URL: ${{ inputs.repo_url }}
+          INPUT_PUBLISH_PATH: ${{ inputs.publish_path }}
+        run: |
+          set -euo pipefail
+
+          EFFECTIVE_REPO_NAME="$INPUT_REPO_NAME"
+          EFFECTIVE_REPO_URL="$INPUT_REPO_URL"
+          EFFECTIVE_PUBLISH_PATH="$INPUT_PUBLISH_PATH"
+
+          if [[ "$INPUT_AUTO_VARIANT_REPO_SPLIT" == "true" ]]; then
+            EFFECTIVE_REPO_NAME="${INPUT_REPO_NAME} (${INPUT_VARIANT})"
+
+            EFFECTIVE_PUBLISH_PATH="fdroid-${INPUT_VARIANT}/fdroid"
+
+            # Normalise l'URL de base en supprimant tout suffixe variant ou chemin fdroid
+            EFFECTIVE_REPO_URL="${INPUT_REPO_URL%/}"
+            EFFECTIVE_REPO_URL="$(printf '%s' "$EFFECTIVE_REPO_URL" | sed -E 's#/repo$##; s#/fdroid$##; s#/fdroid-(complete|technicien)$##')"
+            EFFECTIVE_REPO_URL="${EFFECTIVE_REPO_URL}/fdroid-${INPUT_VARIANT}/fdroid/repo"
+          fi
+
+          echo "repo_name=$EFFECTIVE_REPO_NAME" >> "$GITHUB_OUTPUT"
+          echo "repo_url=$EFFECTIVE_REPO_URL" >> "$GITHUB_OUTPUT"
+          echo "publish_path=$EFFECTIVE_PUBLISH_PATH" >> "$GITHUB_OUTPUT"
+
+          echo "Repo name: $EFFECTIVE_REPO_NAME"
+          echo "Repo URL: $EFFECTIVE_REPO_URL"
+          echo "Publish path: $EFFECTIVE_PUBLISH_PATH"
+
+      - name: Generate private F-Droid repo
+        env:
+          FDROID_KEYSTORE_B64: ${{ secrets.FDROID_KEYSTORE_B64 }}
+          FDROID_KEYSTORE_PASSWORD: ${{ secrets.FDROID_KEYSTORE_PASSWORD }}
+          FDROID_KEY_ALIAS: ${{ secrets.FDROID_KEY_ALIAS }}
+          FDROID_KEY_PASSWORD: ${{ secrets.FDROID_KEY_PASSWORD }}
+        run: |
+          ./tools/publish_fdroid_private.sh \
+            --apk-path "${{ steps.resolve.outputs.apk_path }}" \
+            --repo-dir fdroid-repo \
+            --repo-name "${{ steps.repo_settings.outputs.repo_name }}" \
+            --repo-url "${{ steps.repo_settings.outputs.repo_url }}"
+
+      - name: Publish static F-Droid files (same repository)
+        if: ${{ inputs.publish_repository == '' }}
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ inputs.publish_branch }}
+          folder: ./fdroid-repo
+          target-folder: ${{ steps.repo_settings.outputs.publish_path }}
+          clean: false
+
+      - name: Publish static F-Droid files (external repository)
+        if: ${{ inputs.publish_repository != '' }}
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          token: ${{ secrets.PAGES_PUBLISH_PAT }}
+          repository-name: ${{ inputs.publish_repository }}
+          branch: ${{ inputs.publish_branch }}
+          folder: ./fdroid-repo
+          target-folder: ${{ steps.repo_settings.outputs.publish_path }}
+          clean: false
+
+      - name: Verify published URLs
+        if: ${{ inputs.verify_published_urls == 'true' }}
+        shell: bash
+        env:
+          EFFECTIVE_REPO_URL: ${{ steps.repo_settings.outputs.repo_url }}
+        run: |
+          set -euo pipefail
+          INDEX_JAR_URL="${EFFECTIVE_REPO_URL%/}/index-v1.jar"
+          INDEX_XML_URL="${EFFECTIVE_REPO_URL%/}/index.xml"
+
+          check_with_retry() {
+            local url="$1"
+            local label="$2"
+            local max_attempts=30
+            local sleep_seconds=15
+            local attempt=1
+
+            while (( attempt <= max_attempts )); do
+              code="$(curl -sS -o /dev/null -w '%{http_code}' "$url" || true)"
+              if [[ "$code" == "200" ]]; then
+                echo "$label OK: $url"
+                return 0
+              fi
+              echo "$label not ready (attempt ${attempt}/${max_attempts}, HTTP=${code:-n/a})"
+              sleep "$sleep_seconds"
+              ((attempt++))
+            done
+
+            echo "$label unreachable after retries: $url" >&2
+            return 1
+          }
+
+          check_with_retry "$INDEX_JAR_URL" "index-v1.jar"
+          check_with_retry "$INDEX_XML_URL" "index.xml"
+
+      - name: Publish run summary
+        shell: bash
+        env:
+          EFFECTIVE_REPO_URL: ${{ steps.repo_settings.outputs.repo_url }}
+          EFFECTIVE_PUBLISH_PATH: ${{ steps.repo_settings.outputs.publish_path }}
+          EFFECTIVE_REPO_NAME: ${{ steps.repo_settings.outputs.repo_name }}
+          APK_PATH: ${{ steps.resolve.outputs.apk_path }}
+        run: |
+          set -euo pipefail
+
+          INDEX_JAR_URL="${EFFECTIVE_REPO_URL%/}/index-v1.jar"
+          INDEX_XML_URL="${EFFECTIVE_REPO_URL%/}/index.xml"
+
+          {
+            echo "## F-Droid publication complete"
+            echo
+            echo "- Variant: ${{ inputs.variant }}"
+            echo "- Repo name: ${EFFECTIVE_REPO_NAME}"
+            echo "- Publish path: ${EFFECTIVE_PUBLISH_PATH}"
+            echo "- APK source: ${APK_PATH}"
+            echo "- Repo URL: ${EFFECTIVE_REPO_URL}"
+            echo "- Index (jar): ${INDEX_JAR_URL}"
+            echo "- Index (xml): ${INDEX_XML_URL}"
+            echo
+            echo "Validation rapide: ouvrez index-v1.jar, puis ajoutez Repo URL dans F-Droid client."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "F-Droid summary written to job summary"
