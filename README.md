@@ -50,5 +50,6 @@ Les APK s'installent directement sur Android. Les fichiers AAB sont destinés à
 
 - [Télécharger la dernière release](https://github.com/pollomax847/TechniChauff/releases/latest)
 - [Voir toutes les releases](https://github.com/pollomax847/TechniChauff/releases)
-- [Dépôt F-Droid privé](https://pollomax847.github.io/TechniChauff/fdroid/repo)
+- [Dépôt F-Droid Complete](https://pollomax847.github.io/TechniChauff/fdroid-complete/fdroid/repo)
+- [Dépôt F-Droid Technicien](https://pollomax847.github.io/TechniChauff/fdroid-technicien/fdroid/repo)
 - [Code source privé](https://github.com/pollomax847/assistant_entretien_chaudiere)
